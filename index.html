@@ -127,10 +127,10 @@
   <div id="loader">Henter data...</div>
   <div id="ruler-hint" style="pointer-events:none;"><b>📏 Måling aktiv</b> Klik for punkt • Dobbeltklik for færdig linje • Højreklik for at rydde og gå ud</div>
   <div id="natura-legend">
-    <b>🌿 Natura 2000:</b>
+    <b>🌿 Områder:</b>
     <div class="legend-box">
-      <span><span class="legend-color" style="background:#8e44ad; opacity:0.8"></span> Habitatområder</span>
-      <span><span class="legend-color" style="background:#e84393; opacity:0.5"></span> Fuglebeskyttelse</span>
+      <span><span class="legend-color" style="background:#8e44ad; opacity:0.8"></span> Natura 2000 - Habitatområder</span>
+      <span><span class="legend-color" style="background:#e84393; opacity:0.8"></span> Natura 2000 - Fuglebeskyttelse</span>
     </div>
   </div>
 
@@ -356,17 +356,17 @@
     const habitatLayer = L.tileLayer.wms('https://bio.discomap.eea.europa.eu/arcgis/services/ProtectedSites/Natura2000Sites/MapServer/WMSServer', {
       layers: '0', // Kun Habitatområder (SCI)
       format: 'image/png', transparent: true, attribution: '© EEA Natura 2000', opacity: 0.7, version: '1.3.0'
-    }).addTo(map);
+    });
 
     const birdLayer = L.tileLayer.wms('https://bio.discomap.eea.europa.eu/arcgis/services/ProtectedSites/Natura2000Sites/MapServer/WMSServer', {
       layers: '1', // Kun Fuglebeskyttelsesområder (SPA)
-      format: 'image/png', transparent: true, attribution: '© EEA Natura 2000', opacity: 0.4, version: '1.3.0'
-    }).addTo(map);
+      format: 'image/png', transparent: true, attribution: '© EEA Natura 2000', opacity: 0.8, version: '1.3.0'
+    });
 
     const baseMaps = { "OpenStreetMap": osm };
     const overlayMaps = { 
-      "Habitatområder": habitatLayer,
-      "Fuglebeskyttelse": birdLayer
+      "Natura 2000 - Habitatområder": habitatLayer,
+      "Natura 2000 - Fuglebeskyttelse": birdLayer
     };
 
     L.control.layers(baseMaps, overlayMaps, { position: 'topleft' }).addTo(map);
