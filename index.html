@@ -85,6 +85,33 @@
       font-size: 12px; font-weight: 600; display: none; z-index: 2000;
     }
 
+    #ruler-hint, #natura-legend {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+      background: white; color: #111; padding: 12px 25px; border-radius: 10px;
+      font-size: 13px; font-weight: 600; display: none; z-index: 2000;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15); border: 1px solid #ddd;
+      white-space: nowrap;
+    }
+    #ruler-hint b, #natura-legend b { color: #1a5f2a; margin-right: 5px; }
+    .legend-box { display: inline-flex; align-items: center; gap: 15px; }
+    .legend-color { width: 14px; height: 14px; border-radius: 3px; display: inline-block; vertical-align: middle; border: 1px solid rgba(0,0,0,0.1); }
+
+    /* Popup Styling */
+    .popup-desc { font-size: 12px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px; }
+    .popup-desc b { color: #1a5f2a; }
+    .popup-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
+    .popup-table th, .popup-table td { border: 1px solid #eee; padding: 2px; text-align: center; }
+    .popup-table th { background: #f9f9f9; color: #666; font-weight: normal; }
+
+    /* Ruler UI */
+    .ruler-btn { 
+      display: flex !important; align-items: center !important; justify-content: center !important;
+      width: 34px !important; height: 34px !important; padding: 0 !important; cursor: pointer;
+    }
+    .ruler-active { background-color: #d4ebd6 !important; color: #1a5f2a !important; }
+    .ruler-btn svg { width: 20px; height: 20px; color: #333; }
+    .ruler-active svg { color: #1a5f2a; }
+
     @media (max-width: 600px) {
       .filter-container { left: 10px; width: calc(100% - 20px); }
       .search-container { width: 90%; top: 60px; }
@@ -98,10 +125,18 @@
 
   <div id="map"></div>
   <div id="loader">Henter data...</div>
+  <div id="ruler-hint" style="pointer-events:none;"><b>📏 Måling aktiv</b> Klik for punkt • Dobbeltklik for færdig linje • Højreklik for at rydde og gå ud</div>
+  <div id="natura-legend">
+    <b>🌿 Natura 2000:</b>
+    <div class="legend-box">
+      <span><span class="legend-color" style="background:#8e44ad; opacity:0.8"></span> Habitatområder</span>
+      <span><span class="legend-color" style="background:#e84393; opacity:0.5"></span> Fuglebeskyttelse</span>
+    </div>
+  </div>
 
-  <!-- Search Bar -->
+  <!-- Address Search Bar -->
   <div class="overlay-panel search-container">
-    <input type="text" class="search-input" id="speciesSearch" placeholder="Søg efter art (Dansk eller Latin)..." autocomplete="off">
+    <input type="text" class="search-input" id="addressSearch" placeholder="Søg efter adresse (f.eks. Vejnavn 1, Postnr)..." autocomplete="off">
     <div class="search-results" id="searchResults"></div>
   </div>
 
@@ -109,19 +144,26 @@
   <div class="overlay-panel filter-container">
     <button class="toggle-btn" onclick="toggleMenu('filterPanel')">Filtrering <span id="filterPanel-icon">＋</span></button>
     <div class="card filter-panel" id="filterPanel">
+      <h2>Søg efter art</h2>
+      <div style="margin-bottom: 15px; position: relative;">
+        <input type="text" class="search-input" id="speciesSearch" placeholder="Søg art (Dansk/Latin)..." autocomplete="off" style="padding: 8px 12px;">
+        <div id="speciesSearchResults" class="search-results" style="position: absolute; width: 100%; top: 100%; z-index: 1001;"></div>
+      </div>
+
+      <div id="activeSearchFilter" style="display:none; margin-bottom:15px; padding:10px; background:#f0f7f1; border-radius:6px; border:1px solid #d4ebd6;">
+        <p style="font-size:12px; color:#666">Viser kun søgeresultat:</p>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:5px;">
+          <b id="searchTermText" style="font-size:13px; color:#1a5f2a"></b>
+          <button onclick="clearSearch()" style="background:none; border:none; color:red; cursor:pointer; font-size:12px; font-weight:bold;">Fjern ✕</button>
+        </div>
+      </div>
+
       <h2>Lovmæssig Beskyttelse</h2>
       <label class="check-item"><input type="checkbox" class="filter" value="Fugle Bilag I" checked><span>Fuglebeskyttelsesdirektivet (Bilag I)</span></label>
       <label class="check-item"><input type="checkbox" class="filter" value="Bilag II" checked><span>Habitatdirektivet (Bilag II)</span></label>
       <label class="check-item"><input type="checkbox" class="filter" value="Bilag IV" checked><span>Habitatdirektivet (Bilag IV)</span></label>
       <label class="check-item"><input type="checkbox" class="filter" value="Bilag V" checked><span>Habitatdirektivet (Bilag V)</span></label>
       <label class="check-item"><input type="checkbox" class="filter" value="Fredet" checked><span>Nationalt Fredet</span></label>
-      <div id="activeSearchFilter" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #eee;">
-        <p style="font-size:12px; color:#666">Viser kun søgeresultat:</p>
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:5px;">
-          <b id="searchTermText" style="font-size:13px; color:#1a5f2a"></b>
-          <button onclick="clearSearch()" style="background:none; border:none; color:red; cursor:pointer; font-size:12px;">Fjern ✕</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -133,26 +175,31 @@
       <p style="font-size: 13px; color: #444; line-height: 1.5; margin-bottom: 15px;">
         Dette kort viser fund af beskyttede arter i Danmark baseret på data fra GBIF. Kun arter med særlig beskyttelsesstatus (Bilag I-V eller Fredet) er inkluderet.
       </p>
-      
-      <h2>Inkluderede Arter</h2>
+
+      <h2 style="margin-top: 20px;">Inkluderede Arter</h2>
       
       <h3 style="margin-top:10px; color:#1a5f2a">Pattedyr</h3>
-      <p style="font-size:12px; color:#666">Almindeligt næbhval, Bechsteins flagermus, Birkemus, Brandts flagermus, Bredøret flagermus, Brunflagermus, Bæver, Damflagermus, Dværgflagermus, Døgling, Finhval, Frynseflagermus, Grindehval, Gråsæl, Guldsjakal, Hasselmus, Hvidnæse, Hvidside, Ilder, Kaskelothval, Langøret flagermus, Markhamster, Marsvin, Nordflagermus, Odder, Pipistrelflagermus, Rissosdelfin, Skimmelflagermus, Skovflagermus, Skovmår, Skægflagermus, Snehare, Spækhugger, Spættet sæl, Stor musøre, Sydflagermus, Troldflagermus, Ulv, Vandflagermus, Vågehval, Øresvin</p>
+      <p style="font-size:11px; color:#666; line-height: 1.4;">Almindeligt næbhval, Bechsteins flagermus, Birkemus, Brandts flagermus, Bredøret flagermus, Brunflagermus, Bæver, Damflagermus, Dværgflagermus, Døgling, Finhval, Frynseflagermus, Grindehval, Gråsæl, Guldsjakal, Hasselmus, Hvidnæse, Hvidside, Ilder, Kaskelothval, Langøret flagermus, Markhamster, Marsvin, Nordflagermus, Odder, Pipistrelflagermus, Rissosdelfin, Skimmelflagermus, Skovflagermus, Skovmår, Skægflagermus, Snehare, Spækhugger, Spættet sæl, Stor musøre, Sydflagermus, Troldflagermus, Ulv, Vandflagermus, Vågehval, Øresvin</p>
 
       <h3 style="margin-top:10px; color:#1a5f2a">Fugle</h3>
-      <p style="font-size:12px; color:#666">Blå kærhøg, Blåhals, Bramgås, Brushane, Dværg-rørvagtel, Dværgfalk, Dværghejre, Dværgmåge, Dværgterne, Dværgørn, Ellekrage, Engryle, Engsnarre, Fiskeørn, Fjordterne, Havterne, Havørn, Hedehøg, Hedelærke, Hjejle, Hortulan, Hvepsevåge, Hvid stork, Hvidhalset fluesnapper, Hvidrygget flagspætte, Hvidøjet and, Høgesanger, Høgeugle, Isfugl, Islom, Jagtfalk, Kejserørn, Klyde, Kongeørn, Lapugle, Lille fluesnapper, Lille kobbersneppe, Lille rørvagtel, Lille skallesluger, Lille skrigeørn, Markpiber, Mellemflagspætte, Mosehornugle, Nathejre, Natravn, Nordisk lappedykker, Odinshane, Perleugle, Pibesvane, Plettet rørvagtel, Pomeransfugl, Purpurhøne, Rosenterne, Rosenvarsler, Rovterne, Rustand, Rød glente, Rødhalset gås, Rødrygget tornskade, Rødstrubet lom, Rødvinget braksvale, Rørdrum, Rørhøg, Sandterne, Sangsvane, Skestork, Slagugle, Sneugle, Sort glente, Sort ibis, Sort stork, Sorthovedet måge, Sortspætte, Sortstrubet lom, Sortterne, Splitterne, Spurveugle, Stellersand, Stor hornugle, Stor skrigeørn, Stortrappe, Stylteløber, Sølvhejre, Tinksmed, Trane, Tretået flagspætte, Urfugl, Vandrefalk</p>
+      <p style="font-size:11px; color:#666; line-height: 1.4;">Blå kærhøg, Blåhals, Bramgås, Brushane, Dværg-rørvagtel, Dværgfalk, Dværghejre, Dværgmåge, Dværgterne, Dværgørn, Ellekrage, Engryle, Engsnarre, Fiskeørn, Fjordterne, Havterne, Havørn, Hedehøg, Hedelærke, Hjejle, Hortulan, Hvepsevåge, Hvid stork, Hvidhalset fluesnapper, Hvidrygget flagspætte, Hvidøjet and, Høgesanger, Høgeugle, Isfugl, Islom, Jagtfalk, Kejserørn, Klyde, Kongeørn, Lapugle, Lille fluesnapper, Lille kobbersneppe, Lille rørvagtel, Lille skallesluger, Lille skrigeørn, Markpiber, Mellemflagspætte, Mosehornugle, Nathejre, Natravn, Nordisk lappedykker, Odinshane, Perleugle, Pibesvane, Plettet rørvagtel, Pomeransfugl, Purpurhøne, Rosenterne, Rosenvarsler, Rovterne, Rustand, Rød glente, Rødhalset gås, Rødrygget tornskade, Rødstrubet lom, Rødvinget braksvale, Rørdrum, Rørhøg, Sandterne, Sangsvane, Skestork, Slagugle, Sneugle, Sort glente, Sort ibis, Sort stork, Sorthovedet måge, Sortspætte, Sortstrubet lom, Sortterne, Splitterne, Spurveugle, Stellersand, Stor hornugle, Stor skrigeørn, Stortrappe, Stylteløber, Sølvhejre, Tinksmed, Trane, Tretået flagspætte, Urfugl, Vandrefalk</p>
 
       <h3 style="margin-top:10px; color:#1a5f2a">Padder og Krybdyr</h3>
-      <p style="font-size:12px; color:#666">Butsnudet frø, Glatsnog, Grøn frø, Grønbroget tudse, Hugorm, Klokkefrø, Latterfrø, Lille vandsalamander, Løgfrø, Løvfrø, Markfirben, Skovfirben, Skrubtudse, Snog, Spidssnudet frø, Springfrø, Stor vandsalamander, Strandtudse, Stålorm</p>
+      <p style="font-size:11px; color:#666; line-height: 1.4;">Butsnudet frø, Glatsnog, Grøn frø, Grønbroget tudse, Hugorm, Klokkefrø, Latterfrø, Lille vandsalamander, Løgfrø, Løvfrø, Markfirben, Skovfirben, Skrubtudse, Snog, Spidssnudet frø, Springfrø, Stor vandsalamander, Strandtudse, Stålorm</p>
 
       <h3 style="margin-top:10px; color:#1a5f2a">Fisk</h3>
-      <p style="font-size:12px; color:#666">Bæklampret, Dyndsmert, Flodlampret, Havlampret, Helt, Heltling, Hvidfinnet ferskvandsulk, Laks, Majsild, Pigsmerling, Snæbel, Stalling, Stavsild, Stør</p>
+      <p style="font-size:11px; color:#666; line-height: 1.4;">Bæklampret, Dyndsmert, Flodlampret, Havlampret, Helt, Heltling, Hvidfinnet ferskvandsulk, Laks, Majsild, Pigsmerling, Snæbel, Stalling, Stavsild, Stør</p>
 
       <h3 style="margin-top:10px; color:#1a5f2a">Insekter og Hvirvelløse dyr</h3>
-      <p style="font-size:12px; color:#666">Askepletvinge, Bred vandkalv, Eghjort, Eremit, Flodperlemusling, Grøn kileguldsmed, Grøn mosaikguldsmed, Hedepletvinge, Hvidplettet kærguldsmed, Kildevindelsnegl, Lys skivevandkalv, Lægeigle, Mnemosyne, Natlys-aftensværmer, Perlemorsrandøje, Smalmundet vindelsnegl, Sortplettet blåfugl, Stor egebuk, Stor kærguldsmed, Sumpvindelsnegl, Sydlig fugleedderkop, Tandløs vindelsnegl, Tyk skalet flodmusling, Vinbjergsnegl, Østlig kærguldsmed</p>
+      <p style="font-size:11px; color:#666; line-height: 1.4;">Askepletvinge, Bred vandkalv, Eghjort, Eremit, Flodperlemusling, Grøn kileguldsmed, Grøn mosaikguldsmed, Hedepletvinge, Hvidplettet kærguldsmed, Kildevindelsnegl, Lys skivevandkalv, Lægeigle, Mnemosyne, Natlys-aftensværmer, Perlemorsrandøje, Smalmundet vindelsnegl, Sortplettet blåfugl, Stor egebuk, Stor kærguldsmed, Sumpvindelsnegl, Sydlig fugleedderkop, Tandløs vindelsnegl, Tyk skalet flodmusling, Vinbjergsnegl, Østlig kærguldsmed</p>
 
       <h3 style="margin-top:10px; color:#1a5f2a">Planter</h3>
-      <p style="font-size:12px; color:#666">Almindelig månerude, Almindelig ulvefod, Bakke-gøgelilje, Brændeskærm, Cypres-ulvefod, Eng-ensian, Enkel månerude, Felt-ensian, Femradet ulvefod, Flad ulvefod, Flod-klaseskærm, Flueblomst, Flydende krandsen, Fruesko, Grøn bustmos, Grøn snotmos, Gul stenbræk, Hindenbregne, Hjertebladet fliglæbe, Hjertelæbe, Honningblomst, Horndrager, Hvid gøgeurt, Hvid hullæbe, Hylde-gøgeurt, Kamille-månerude, Klit-ensian, Knælæbe, Knærod, Koralrod, Krybende selleri, Kødfarvet gøgeurt, Langsporet gøgeurt, Liden ulvefod, Maj-gøgeurt, Melet kodriver, Mygblomst, Müllers hullæbe, Nikkende kobjælde, Oprejst kobjælde, Opret ulvefod, Plettet gøgeurt, Præstebakke-hullæbe, Purpur-gøgeurt, Redeurt, Rød hullæbe, Rødbrun hullæbe, Salep-gøgeurt, Skov-gøgelilje, Skov-gøgeurt, Skov-hullæbe, Skrueaks, Smalbladet gøgeurt, Smalbladet hullæbe, Smalbladet lungeurt, Sort-brasenføde, Stilk-månerude, Stor gøgeurt, Sump-hullæbe, Sværd-hullæbe, Sø-brasenføde, Taks, Tyndakset gøgeurt, Tætblomstret hullæbe, Vårkobjælde, Ægbladet fliglæbe</p>
+      <p style="font-size:11px; color:#666; line-height: 1.4;">Almindelig månerude, Almindelig ulvefod, Bakke-gøgelilje, Brændeskærm, Cypres-ulvefod, Eng-ensian, Enkel månerude, Felt-ensian, Femradet ulvefod, Flad ulvefod, Flod-klaseskærm, Flueblomst, Flydende krandsen, Fruesko, Grøn bustmos, Grøn snotmos, Gul stenbræk, Hindenbregne, Hjertebladet fliglæbe, Hjertelæbe, Honningblomst, Horndrager, Hvid gøgeurt, Hvid hullæbe, Hylde-gøgeurt, Kamille-månerude, Klit-ensian, Knælæbe, Knærod, Koralrod, Krybende selleri, Kødfarvet gøgeurt, Langsporet gøgeurt, Liden ulvefod, Maj-gøgeurt, Melet kodriver, Mygblomst, Müllers hullæbe, Nikkende kobjælde, Oprejst kobjælde, Opret ulvefod, Plettet gøgeurt, Præstebakke-hullæbe, Purpur-gøgeurt, Redeurt, Rød hullæbe, Rødbrun hullæbe, Salep-gøgeurt, Skov-gøgelilje, Skov-gøgeurt, Skov-hullæbe, Skrueaks, Smalbladet gøgeurt, Smalbladet hullæbe, Smalbladet lungeurt, Sort-brasenføde, Stilk-månerude, Stor gøgeurt, Sump-hullæbe, Sværd-hullæbe, Sø-brasenføde, Taks, Tyndakset gøgeurt, Tætblomstret hullæbe, Vårkobjælde, Ægbladet fliglæbe</p>
+      
+      <hr style="margin-top: 20px; margin-bottom: 15px; border: 0; border-top: 1px solid #eee;">
+      <p style="font-size: 13px; color: #1a5f2a; font-weight: 600;">
+        Kontakt: <a href="mailto:stc@ek.dk" style="color: #1a5f2a; text-decoration: none;">stc@ek.dk</a>
+      </p>
     </div>
   </div>
 
@@ -190,11 +237,12 @@
     }
 
     // --- State & Config ---
-    const BASE_URL = 'https://raw.githubusercontent.com/SorenThromsholdt/dk-protected-species/SorenThromsholdt-patch-1/';
+    const BASE_URL = 'data/';
     const loadedTiles = new Map();
     const checkedTiles = new Set(); 
     let activeFilters = new Set();
     let searchableSpecies = [];
+    let speciesDesc = {};
     let currentSearchSpecies = null;
 
     const COLORS = {
@@ -202,37 +250,37 @@
       'Fugle': '#e67e22', 'Fredet': '#27ae60', 'default': '#95a5a6'
     };
 
-    // --- Search Logic ---
-    const searchInput = document.getElementById('speciesSearch');
-    const searchResults = document.getElementById('searchResults');
+    // --- Search Logic (Species) ---
+    const speciesInput = document.getElementById('speciesSearch');
+    const speciesResults = document.getElementById('speciesSearchResults');
 
-    searchInput.oninput = () => {
-      const val = searchInput.value.toLowerCase();
-      searchResults.innerHTML = '';
-      if (!val) { searchResults.style.display = 'none'; return; }
+    speciesInput.oninput = () => {
+      const val = speciesInput.value.toLowerCase().trim();
+      speciesResults.innerHTML = '';
+      if (!val || val.length < 2) { speciesResults.style.display = 'none'; return; }
 
       const matches = searchableSpecies.filter(s => 
         (s.dan && s.dan.toLowerCase().includes(val)) || 
         (s.lat && s.lat.toLowerCase().includes(val))
-      ).slice(0, 10);
+      ).slice(0, 15);
 
       if (matches.length > 0) {
         matches.forEach(m => {
           const div = document.createElement('div');
           div.innerHTML = `<b>${m.dan || ''}</b> <br><small>${m.lat || ''}</small>`;
           div.onclick = () => selectSpecies(m);
-          searchResults.appendChild(div);
+          speciesResults.appendChild(div);
         });
-        searchResults.style.display = 'block';
+        speciesResults.style.display = 'block';
       } else {
-        searchResults.style.display = 'none';
+        speciesResults.style.display = 'none';
       }
     };
 
     function selectSpecies(species) {
       currentSearchSpecies = species.lat;
-      searchInput.value = species.dan || species.lat;
-      searchResults.style.display = 'none';
+      speciesInput.value = species.dan || species.lat;
+      speciesResults.style.display = 'none';
       document.getElementById('activeSearchFilter').style.display = 'block';
       document.getElementById('searchTermText').textContent = species.dan || species.lat;
       renderMarkers();
@@ -240,27 +288,227 @@
 
     function clearSearch() {
       currentSearchSpecies = null;
-      searchInput.value = '';
+      speciesInput.value = '';
       document.getElementById('activeSearchFilter').style.display = 'none';
       renderMarkers();
     }
 
-    // --- Configuration ---
+    // --- Search Logic (Address - DAWA) ---
+    const addressInput = document.getElementById('addressSearch');
+    const addressResults = document.getElementById('searchResults');
+    let addressMarker = null;
+
+    addressInput.oninput = async () => {
+      const val = addressInput.value.trim();
+      addressResults.innerHTML = '';
+      if (val.length < 3) { addressResults.style.display = 'none'; return; }
+
+      try {
+        const res = await fetch(`https://api.dataforsyningen.dk/adresser/autocomplete?q=${encodeURIComponent(val)}`);
+        const data = await res.json();
+        if (data.length > 0) {
+          data.forEach(item => {
+            const div = document.createElement('div');
+            div.textContent = item.tekst;
+            div.onclick = () => selectAddress(item);
+            addressResults.appendChild(div);
+          });
+          addressResults.style.display = 'block';
+        } else {
+          addressResults.style.display = 'none';
+        }
+      } catch (e) { console.error("DAWA error:", e); }
+    };
+
+    async function selectAddress(item) {
+      addressInput.value = item.tekst;
+      addressResults.style.display = 'none';
+      try {
+        const res = await fetch(item.adresse.href);
+        const data = await res.json();
+        const lat = data.adgangsadresse.adgangspunkt.koordinater[1];
+        const lng = data.adgangsadresse.adgangspunkt.koordinater[0];
+        if (addressMarker) map.removeLayer(addressMarker);
+        addressMarker = L.marker([lat, lng]).addTo(map)
+          .bindPopup(`<b>Søgt adresse:</b><br>${item.tekst}`).openPopup();
+        map.setView([lat, lng], 16);
+      } catch (e) { console.error("Address error:", e); }
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!addressInput.contains(e.target)) addressResults.style.display = 'none';
+      if (!speciesInput.contains(e.target)) speciesResults.style.display = 'none';
+    });
+
+    // --- Map Initialization ---
     const map = L.map('map', { 
       preferCanvas: true,
       zoomControl: false 
     }).setView([55.9, 11.5], 7);
 
     L.control.zoom({ position: 'topleft' }).addTo(map);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
+    // Natura 2000 - Opdelt i to lag for bedre farveadskillelse
+    const habitatLayer = L.tileLayer.wms('https://bio.discomap.eea.europa.eu/arcgis/services/ProtectedSites/Natura2000Sites/MapServer/WMSServer', {
+      layers: '0', // Kun Habitatområder (SCI)
+      format: 'image/png', transparent: true, attribution: '© EEA Natura 2000', opacity: 0.7, version: '1.3.0'
+    }).addTo(map);
+
+    const birdLayer = L.tileLayer.wms('https://bio.discomap.eea.europa.eu/arcgis/services/ProtectedSites/Natura2000Sites/MapServer/WMSServer', {
+      layers: '1', // Kun Fuglebeskyttelsesområder (SPA)
+      format: 'image/png', transparent: true, attribution: '© EEA Natura 2000', opacity: 0.4, version: '1.3.0'
+    }).addTo(map);
+
+    const baseMaps = { "OpenStreetMap": osm };
+    const overlayMaps = { 
+      "Habitatområder": habitatLayer,
+      "Fuglebeskyttelse": birdLayer
+    };
+
+    L.control.layers(baseMaps, overlayMaps, { position: 'topleft' }).addTo(map);
+
+    // Funktion til at vise/skjule signaturforklaring
+    function updateNaturaLegend() {
+      const legend = document.getElementById('natura-legend');
+      if (map.hasLayer(habitatLayer) || map.hasLayer(birdLayer)) {
+        legend.style.display = 'block';
+      } else {
+        legend.style.display = 'none';
+      }
+    }
+    map.on('overlayadd overlayremove', updateNaturaLegend);
+    updateNaturaLegend(); // Initial tjek
+    let rulerActive = false;
+    let rulerPoints = [];
+    let rulerMarkers = [];
+    let rulerPolyline = null;
+    let tempLine = null;
+    let tempPopup = null;
+    let finishedLines = [];
+
+    const RulerControl = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd: function() {
+        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+        const button = L.DomUtil.create('a', 'ruler-btn', container);
+        button.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11,10.5V8.5L12.5,7L13.9,8.4L12.4,9.9L13.8,11.3L15.3,9.8L16.7,11.2L15.2,12.7L16.6,14.1L18.1,12.6L19.5,14L18,15.5L19.4,16.9L20.9,15.4L22.3,16.8L16.8,22.3L2,7.5L7.5,2L11,5.5V10.5Z"/></svg>`;
+        button.href = '#';
+        button.title = 'Mål afstand (Dobbeltklik for færdig linje, Højreklik for at rydde)';
+        L.DomEvent.on(button, 'click', function(e) {
+          L.DomEvent.stopPropagation(e);
+          L.DomEvent.preventDefault(e);
+          toggleRuler();
+        });
+        L.DomEvent.disableClickPropagation(container);
+        return container;
+      }
+    });
+    map.addControl(new RulerControl());
+
+    function toggleRuler() {
+      const button = document.querySelector('.ruler-btn');
+      const hint = document.getElementById('ruler-hint');
+      rulerActive = !rulerActive;
+      if (rulerActive) {
+        button.classList.add('ruler-active');
+        map.getContainer().style.cursor = 'crosshair';
+        hint.style.display = 'block';
+      } else {
+        button.classList.remove('ruler-active');
+        map.getContainer().style.cursor = '';
+        hint.style.display = 'none';
+        stopActiveMeasurement();
+      }
+    }
+
+    function stopActiveMeasurement() {
+      if (tempLine) map.removeLayer(tempLine);
+      if (tempPopup) map.removeLayer(tempPopup);
+      if (rulerPolyline) map.removeLayer(rulerPolyline);
+      rulerMarkers.forEach(m => map.removeLayer(m));
+      tempLine = null; tempPopup = null; rulerPolyline = null;
+      rulerPoints = []; rulerMarkers = [];
+    }
+
+    function clearAllRulers() {
+      stopActiveMeasurement();
+      finishedLines.forEach(item => {
+        if (item.line) map.removeLayer(item.line);
+        if (item.label) map.removeLayer(item.label);
+        if (item.markers) item.markers.forEach(m => map.removeLayer(m));
+      });
+      finishedLines = [];
+    }
+
+    map.on('click', (e) => {
+      if (!rulerActive) return;
+      const point = e.latlng;
+      rulerPoints.push(point);
+      const dot = L.circleMarker(point, {
+        radius: 4, color: 'red', fillColor: 'white', fillOpacity: 1, weight: 2
+      }).addTo(map);
+      rulerMarkers.push(dot);
+      updateRuler();
+    });
+
+    map.on('dblclick', (e) => {
+      if (!rulerActive || rulerPoints.length < 2) return;
+      let totalDist = 0;
+      for (let i = 0; i < rulerPoints.length - 1; i++) {
+        totalDist += rulerPoints[i].distanceTo(rulerPoints[i+1]);
+      }
+      const distStr = totalDist > 1000 ? (totalDist/1000).toFixed(2) + ' km' : totalDist.toFixed(0) + ' m';
+      const finalLine = L.polyline(rulerPoints, { color: '#e74c3c', weight: 3 }).addTo(map);
+      const label = L.marker(rulerPoints[rulerPoints.length - 1], {
+        icon: L.divIcon({
+          className: 'ruler-label',
+          html: `<div style="background:white; border:1px solid red; padding:2px 5px; border-radius:3px; white-space:nowrap; font-size:11px; font-weight:bold; color:red; transform:translate(10px, -10px);">${distStr}</div>`,
+          iconSize: [0, 0]
+        })
+      }).addTo(map);
+      finishedLines.push({ line: finalLine, label: label, markers: [...rulerMarkers] });
+      stopActiveMeasurement();
+    });
+
+    map.on('mousedown', () => {
+      if (rulerActive) map.doubleClickZoom.disable();
+      else map.doubleClickZoom.enable();
+    });
+
+    map.on('contextmenu', (e) => {
+      if (rulerActive) {
+        L.DomEvent.preventDefault(e);
+        clearAllRulers();
+        toggleRuler();
+      }
+    });
+
+    map.on('mousemove', (e) => {
+      if (!rulerActive || rulerPoints.length === 0) return;
+      const lastPoint = rulerPoints[rulerPoints.length - 1];
+      const currentPos = e.latlng;
+      if (tempLine) tempLine.setLatLngs([lastPoint, currentPos]);
+      else tempLine = L.polyline([lastPoint, currentPos], { color: 'red', weight: 2, dashArray: '5, 10' }).addTo(map);
+      let totalDist = 0;
+      for (let i = 0; i < rulerPoints.length - 1; i++) totalDist += rulerPoints[i].distanceTo(rulerPoints[i+1]);
+      totalDist += lastPoint.distanceTo(currentPos);
+      const distStr = totalDist > 1000 ? (totalDist/1000).toFixed(2) + ' km' : totalDist.toFixed(0) + ' m';
+      if (!tempPopup) tempPopup = L.popup({ closeButton: false, autoClose: false, closeOnClick: false, className: 'ruler-popup', offset: [0, -10] });
+      tempPopup.setLatLng(currentPos).setContent('Afstand: ' + distStr).openOn(map);
+    });
+
+    function updateRuler() {
+      if (rulerPolyline) rulerPolyline.setLatLngs(rulerPoints);
+      else rulerPolyline = L.polyline(rulerPoints, { color: 'red', weight: 3 }).addTo(map);
+    }
+
+    // --- Species Markers & Data ---
     const clusters = L.markerClusterGroup({
-      maxClusterRadius: 40,
-      showCoverageOnHover: false,
-      chunkedLoading: true,
-      removeOutsideVisibleBounds: true
+      maxClusterRadius: 40, showCoverageOnHover: false, chunkedLoading: true, removeOutsideVisibleBounds: true
     });
     map.addLayer(clusters);
 
@@ -277,35 +525,45 @@
     function renderMarkers() {
       clusters.clearLayers();
       const bounds = map.getBounds();
-      const x1 = Math.floor(bounds.getSouth());
-      const x2 = Math.floor(bounds.getNorth());
-      const y1 = Math.floor(bounds.getWest());
-      const y2 = Math.floor(bounds.getEast());
-
+      const x1 = Math.floor(bounds.getSouth()), x2 = Math.floor(bounds.getNorth());
+      const y1 = Math.floor(bounds.getWest()), y2 = Math.floor(bounds.getEast());
       const markersToAdd = [];
 
       for (let x = x1; x <= x2; x++) {
         for (let y = y1; y <= y2; y++) {
-          const key = `${x}_${y}`;
-          const data = loadedTiles.get(key);
+          const data = loadedTiles.get(`${x}_${y}`);
           if (!data) continue;
-
           data.forEach(d => {
             if (currentSearchSpecies && d.species !== currentSearchSpecies) return;
             if (d.protection && d.protection.some(p => activeFilters.has(p))) {
               const m = L.circleMarker([d.lat, d.lng], {
-                radius: 7,
-                fillColor: getColor(d.protection),
-                color: 'transparent',
-                weight: 12,
-                fillOpacity: 0.9
+                radius: 7, fillColor: getColor(d.protection), color: 'transparent', weight: 12, fillOpacity: 0.9
               });
-
               m.on('click', (ev) => {
                 L.DomEvent.stopPropagation(ev);
-                let h = `<div style="min-width:200px"><b>${d.commonName || d.species}</b><br><i>${d.species}</i><hr>`;
+                const dist = new Array(12).fill(0);
+                let totalForSpecies = 0;
+                loadedTiles.forEach(tileData => {
+                  tileData.forEach(r => {
+                    if (r.species === d.species && r.date) {
+                      const month = parseInt(r.date.split('-')[1]);
+                      if (month >= 1 && month <= 12) { dist[month - 1]++; totalForSpecies++; }
+                    }
+                  });
+                });
+                let h = `<div style="min-width:280px"><b>${d.commonName || d.species}</b><br><i>${d.species}</i><hr>`;
                 h += `<div style="margin:8px 0">${d.protection.map(p => `<span class="tag" style="background:${getColor([p])}">${p}</span>`).join("")}</div>`;
-                if (d.date) h += `<small>Seneste fund: ${d.date}</small>`;
+                const desc = speciesDesc[d.species];
+                if (desc) {
+                  h += `<div class="popup-desc"><b>Levested:</b> ${desc.habitat}<br><b>Rasteplads:</b> ${desc.resting}<br><b>Føde:</b> ${desc.food}<br><b>Yngleplads:</b> ${desc.breeding}</div>`;
+                }
+                h += `<div style="margin-top:12px;"><b style="font-size:11px; color:#1a5f2a;">Månedsfordeling (antal fund på kortet):</b><table class="popup-table"><tr>${['J','F','M','A','M','J','J','A','S','O','N','D'].map(m => `<th>${m}</th>`).join("")}</tr><tr>${dist.map(count => {
+                  const intensity = count > 0 ? Math.max(0.1, count / (Math.max(...dist) || 1)) : 0;
+                  const color = count > 0 ? `rgba(26, 95, 42, ${intensity})` : 'transparent';
+                  return `<td style="background:${color};">${count || '-'}</td>`;
+                }).join("")}</tr></table></div>`;
+                h += `<div style="margin-top:10px; font-size:11px;"><a href="https://www.naturbasen.dk/art/${d.species.replace(' ', '-')}" target="_blank">Se art på Naturbasen ↗</a></div>`;
+                if (d.date) h += `<br><small>Seneste fund: ${d.date}</small>`;
                 h += `</div>`;
                 L.popup().setLatLng([d.lat, d.lng]).setContent(h).openOn(map);
               });
@@ -358,9 +616,13 @@
 
     async function init() {
       try {
-        const res = await fetch(BASE_URL + 'searchable_species.json');
-        searchableSpecies = await res.json();
-      } catch(e) { console.error("Could not load searchable species list"); }
+        const [resSpec, resDesc] = await Promise.all([
+          fetch(BASE_URL + 'searchable_species.json'),
+          fetch('species_descriptions.json')
+        ]);
+        searchableSpecies = await resSpec.json();
+        speciesDesc = await resDesc.json();
+      } catch(e) { console.error("Data load error"); }
       updateFilters();
       syncData();
     }
