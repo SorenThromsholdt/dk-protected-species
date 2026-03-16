@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
   <style>
     /* ========== Base Layout ========== */
@@ -56,7 +57,7 @@
     .search-results b { color: #1a5f2a; }
 
     /* Filter (top-left) */
-    .filter-container { top: 10px; left: 50px; }
+    .filter-container { top: 10px; left: 55px; }
     .filter-panel { margin-top: 10px; width: 280px; display: none; }
     .filter-panel.open { display: block; }
 
@@ -106,14 +107,42 @@
     .popup-table th, .popup-table td { border: 1px solid #eee; padding: 2px; text-align: center; }
     .popup-table th { background: #f9f9f9; color: #666; font-weight: normal; }
 
-    /* Ruler UI */
-    .ruler-btn { 
+    /* Ruler UI & Control Consistency */
+    .leaflet-bar a, 
+    .leaflet-control-layers-toggle,
+    .ruler-btn,
+    .screenshot-btn { 
       display: flex !important; align-items: center !important; justify-content: center !important;
       width: 34px !important; height: 34px !important; padding: 0 !important; cursor: pointer;
+      line-height: 34px !important;
     }
-    .ruler-active { background-color: #d4ebd6 !important; color: #1a5f2a !important; }
-    .ruler-btn svg { width: 20px; height: 20px; color: #333; }
-    .ruler-active svg { color: #1a5f2a; }
+    .ruler-active, .screenshot-active { background-color: #d4ebd6 !important; color: #1a5f2a !important; }
+    .ruler-btn svg, .screenshot-btn svg { width: 20px; height: 20px; color: #333; }
+    .ruler-active svg, .screenshot-active svg { color: #1a5f2a; }
+
+    /* Screenshot UI */
+    #screenshot-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.3); z-index: 3000; display: none;
+      pointer-events: none;
+    }
+    #crop-box {
+      position: absolute; top: 20%; left: 20%; width: 400px; height: 300px;
+      border: 2px dashed #1a5f2a; background: rgba(255,255,255,0.05);
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); pointer-events: auto;
+      cursor: move; min-width: 50px; min-height: 50px;
+      resize: both; overflow: hidden;
+    }
+    #capture-action-container {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+      z-index: 3001; display: none;
+    }
+    .capture-btn {
+      background: #1a5f2a; color: white; border: none; padding: 12px 30px;
+      border-radius: 30px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 16px;
+    }
+    .capture-btn:hover { background: #144a21; }
 
     @media (max-width: 600px) {
       .filter-container { left: 10px; width: calc(100% - 20px); }
@@ -138,6 +167,14 @@
       <span><span class="legend-color" style="background:#8e44ad; opacity:0.7"></span> Habitatområder</span>
       <span><span class="legend-color" style="background:#e84393; opacity:0.8"></span> Fuglebeskyttelse</span>
     </div>
+  </div>
+
+  <div id="screenshot-overlay">
+    <div id="crop-box"></div>
+  </div>
+
+  <div id="capture-action-container">
+    <button class="capture-btn" onclick="takeScreenshot()">📸 Tag billede</button>
   </div>
 
   <!-- Address Search Bar -->
@@ -204,7 +241,8 @@
       
       <hr style="margin-top: 20px; margin-bottom: 15px; border: 0; border-top: 1px solid #eee;">
       <p style="font-size: 13px; color: #1a5f2a; font-weight: 600;">
-        Kontakt: <a href="mailto:stc@ek.dk" style="color: #1a5f2a; text-decoration: none;">stc@ek.dk</a>
+        Kontakt: Søren Thromsholdt Christensen<br>
+        <a href="mailto:stc@ek.dk" style="color: #1a5f2a; text-decoration: none;">stc@ek.dk</a>
       </p>
     </div>
   </div>
@@ -355,21 +393,32 @@
     L.control.zoom({ position: 'topleft' }).addTo(map);
 
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap'
+      attribution: '&copy; OpenStreetMap',
+      crossOrigin: true
     }).addTo(map);
+
+    const ortofoto = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community',
+      crossOrigin: true
+    });
 
     // Natura 2000 - Opdelt i to lag for bedre farveadskillelse
     const habitatLayer = L.tileLayer.wms('https://bio.discomap.eea.europa.eu/arcgis/services/ProtectedSites/Natura2000Sites/MapServer/WMSServer', {
       layers: '0', // Kun Habitatområder (SCI)
-      format: 'image/png', transparent: true, attribution: '© EEA Natura 2000', opacity: 0.7, version: '1.3.0'
+      format: 'image/png', transparent: true, attribution: '© EEA Natura 2000', opacity: 0.7, version: '1.3.0',
+      crossOrigin: true
     });
 
     const birdLayer = L.tileLayer.wms('https://bio.discomap.eea.europa.eu/arcgis/services/ProtectedSites/Natura2000Sites/MapServer/WMSServer', {
       layers: '1', // Kun Fuglebeskyttelsesområder (SPA)
-      format: 'image/png', transparent: true, attribution: '© EEA Natura 2000', opacity: 0.8, version: '1.3.0'
+      format: 'image/png', transparent: true, attribution: '© EEA Natura 2000', opacity: 0.8, version: '1.3.0',
+      crossOrigin: true
     });
 
-    const baseMaps = { "OpenStreetMap": osm };
+    const baseMaps = { 
+      "OpenStreetMap": osm,
+      "Ortofoto (Satellit)": ortofoto
+    };
     const overlayMaps = { 
       "Natura 2000 - Habitatområder": habitatLayer,
       "Natura 2000 - Fuglebeskyttelse": birdLayer
@@ -387,6 +436,107 @@
       }
     }
     map.on('overlayadd overlayremove', updateNaturaLegend);
+
+    // --- Screenshot Logic ---
+    let screenshotActive = false;
+    const screenshotOverlay = document.getElementById('screenshot-overlay');
+    const cropBox = document.getElementById('crop-box');
+    const captureContainer = document.getElementById('capture-action-container');
+
+    const ScreenshotControl = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd: function() {
+        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+        const button = L.DomUtil.create('a', 'screenshot-btn', container);
+        button.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z"/></svg>`;
+        button.href = '#';
+        button.title = 'Tag billede af kortet (Vælg område og klik på knappen i bunden)';
+        L.DomEvent.on(button, 'click', function(e) {
+          L.DomEvent.stopPropagation(e);
+          L.DomEvent.preventDefault(e);
+          toggleScreenshot();
+        });
+        L.DomEvent.disableClickPropagation(container);
+        return container;
+      }
+    });
+    map.addControl(new ScreenshotControl());
+
+    function toggleScreenshot() {
+      screenshotActive = !screenshotActive;
+      const button = document.querySelector('.screenshot-btn');
+      if (screenshotActive) {
+        button.classList.add('screenshot-active');
+        screenshotOverlay.style.display = 'block';
+        captureContainer.style.display = 'block';
+        if (rulerActive) toggleRuler();
+      } else {
+        button.classList.remove('screenshot-active');
+        screenshotOverlay.style.display = 'none';
+        captureContainer.style.display = 'none';
+      }
+    }
+
+    // Draggable logic for crop-box
+    let isDragging = false;
+    let startX, startY, startLeft, startTop;
+
+    cropBox.addEventListener('mousedown', (e) => {
+      // Don't drag if we're hitting the resize handle (bottom right)
+      const rect = cropBox.getBoundingClientRect();
+      if (e.clientX > rect.right - 20 && e.clientY > rect.bottom - 20) return;
+
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = cropBox.offsetLeft;
+      startTop = cropBox.offsetTop;
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      cropBox.style.left = (startLeft + dx) + 'px';
+      cropBox.style.top = (startTop + dy) + 'px';
+    });
+
+    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    async function takeScreenshot() {
+      const loader = document.getElementById('loader');
+      loader.textContent = 'Genererer billede...';
+      loader.style.display = 'block';
+      captureContainer.style.display = 'none';
+
+      const rect = cropBox.getBoundingClientRect();
+      
+      try {
+        const canvas = await html2canvas(document.getElementById('map'), {
+          useCORS: true,
+          allowTaint: false,
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height,
+          scale: 2 
+        });
+
+        const link = document.createElement('a');
+        link.download = `beskyttede_arter_kort_${new Date().toISOString().slice(0,10)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } catch (e) {
+        console.error("Screenshot error:", e);
+        alert("Fejl under dannelse af billede. Prøv igen.");
+      } finally {
+        loader.style.display = 'none';
+        loader.textContent = 'Henter data...';
+        captureContainer.style.display = 'block';
+        toggleScreenshot();
+      }
+    }
 
     // --- Ruler Logic ---
     let rulerActive = false;
@@ -424,6 +574,7 @@
         button.classList.add('ruler-active');
         map.getContainer().style.cursor = 'crosshair';
         hint.style.display = 'block';
+        if (screenshotActive) toggleScreenshot();
       } else {
         button.classList.remove('ruler-active');
         map.getContainer().style.cursor = '';
