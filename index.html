@@ -85,15 +85,18 @@
       font-size: 12px; font-weight: 600; display: none; z-index: 2000;
     }
 
+    /* Centered bottom panels (Ruler Hint & Natura Legend) */
     #ruler-hint, #natura-legend {
       position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
       background: white; color: #111; padding: 12px 25px; border-radius: 10px;
       font-size: 13px; font-weight: 600; display: none; z-index: 2000;
       box-shadow: 0 4px 15px rgba(0,0,0,0.15); border: 1px solid #ddd;
       white-space: nowrap;
+      width: min(550px, 90vw); /* Fixed responsive width */
+      text-align: center;      /* Centered text */
     }
     #ruler-hint b, #natura-legend b { color: #1a5f2a; margin-right: 5px; }
-    .legend-box { display: inline-flex; align-items: center; gap: 15px; }
+    .legend-box { display: inline-flex; align-items: center; gap: 15px; justify-content: center; width: 100%; margin-top: 5px; }
     .legend-color { width: 14px; height: 14px; border-radius: 3px; display: inline-block; vertical-align: middle; border: 1px solid rgba(0,0,0,0.1); }
 
     /* Popup Styling */
@@ -118,6 +121,7 @@
       .filter-panel { width: 100%; }
       .info-panel { width: calc(100vw - 20px); }
       .legend-panel { display: none; }
+      #ruler-hint, #natura-legend { font-size: 11px; padding: 10px 15px; }
     }
   </style>
 </head>
@@ -125,12 +129,14 @@
 
   <div id="map"></div>
   <div id="loader">Henter data...</div>
-  <div id="ruler-hint" style="pointer-events:none;"><b>📏 Måling aktiv</b> Klik for punkt • Dobbeltklik for færdig linje • Højreklik for at rydde og gå ud</div>
+  
+  <div id="ruler-hint" style="pointer-events:none;"><b>📏 Måling aktiv</b> Klik for punkt • Dobbeltklik for færdig linje • Højreklik for at rydde</div>
+  
   <div id="natura-legend">
-    <b>🌿 Områder:</b>
+    <b>🌿 Natura 2000 Områder:</b>
     <div class="legend-box">
-      <span><span class="legend-color" style="background:#8e44ad; opacity:0.8"></span> Natura 2000 - Habitatområder</span>
-      <span><span class="legend-color" style="background:#e84393; opacity:0.8"></span> Natura 2000 - Fuglebeskyttelse</span>
+      <span><span class="legend-color" style="background:#8e44ad; opacity:0.7"></span> Habitatområder</span>
+      <span><span class="legend-color" style="background:#e84393; opacity:0.8"></span> Fuglebeskyttelse</span>
     </div>
   </div>
 
@@ -203,7 +209,7 @@
     </div>
   </div>
 
-  <!-- Legend -->
+  <!-- Legend (Left) -->
   <div class="overlay-panel legend-panel">
     <div class="card">
       <h3>Signaturforklaring</h3>
@@ -262,7 +268,7 @@
       const matches = searchableSpecies.filter(s => 
         (s.dan && s.dan.toLowerCase().includes(val)) || 
         (s.lat && s.lat.toLowerCase().includes(val))
-      ).slice(0, 15);
+      ).slice(0, 10);
 
       if (matches.length > 0) {
         matches.forEach(m => {
@@ -381,7 +387,8 @@
       }
     }
     map.on('overlayadd overlayremove', updateNaturaLegend);
-    updateNaturaLegend(); // Initial tjek
+
+    // --- Ruler Logic ---
     let rulerActive = false;
     let rulerPoints = [];
     let rulerMarkers = [];
@@ -542,12 +549,11 @@
               m.on('click', (ev) => {
                 L.DomEvent.stopPropagation(ev);
                 const dist = new Array(12).fill(0);
-                let totalForSpecies = 0;
                 loadedTiles.forEach(tileData => {
                   tileData.forEach(r => {
                     if (r.species === d.species && r.date) {
                       const month = parseInt(r.date.split('-')[1]);
-                      if (month >= 1 && month <= 12) { dist[month - 1]++; totalForSpecies++; }
+                      if (month >= 1 && month <= 12) { dist[month - 1]++; }
                     }
                   });
                 });
