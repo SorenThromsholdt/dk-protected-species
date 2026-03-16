@@ -86,8 +86,8 @@
       font-size: 12px; font-weight: 600; display: none; z-index: 2000;
     }
 
-    /* Centered bottom panels (Ruler Hint & Natura Legend) */
-    #ruler-hint, #natura-legend {
+    /* Centered bottom panels (Ruler Hint, Screenshot Hint & Natura Legend) */
+    #ruler-hint, #screenshot-hint, #natura-legend {
       position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
       background: white; color: #111; padding: 12px 25px; border-radius: 10px;
       font-size: 13px; font-weight: 600; display: none; z-index: 2000;
@@ -96,7 +96,7 @@
       width: min(550px, 90vw); /* Fixed responsive width */
       text-align: center;      /* Centered text */
     }
-    #ruler-hint b, #natura-legend b { color: #1a5f2a; margin-right: 5px; }
+    #ruler-hint b, #screenshot-hint b, #natura-legend b { color: #1a5f2a; margin-right: 5px; }
     .legend-box { display: inline-flex; align-items: center; gap: 15px; justify-content: center; width: 100%; margin-top: 5px; }
     .legend-color { width: 14px; height: 14px; border-radius: 3px; display: inline-block; vertical-align: middle; border: 1px solid rgba(0,0,0,0.1); }
 
@@ -123,8 +123,8 @@
     /* Screenshot UI */
     #screenshot-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.3); z-index: 3000; display: none;
-      pointer-events: none;
+      background: transparent; z-index: 3000; display: none;
+      pointer-events: auto;
     }
     #crop-box {
       position: absolute; top: 20%; left: 20%; width: 400px; height: 300px;
@@ -134,7 +134,7 @@
       resize: both; overflow: hidden;
     }
     #capture-action-container {
-      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
       z-index: 3001; display: none;
     }
     .capture-btn {
@@ -160,6 +160,7 @@
   <div id="loader">Henter data...</div>
   
   <div id="ruler-hint" style="pointer-events:none;"><b>📏 Måling aktiv</b> Klik for punkt • Dobbeltklik for færdig linje • Højreklik for at rydde</div>
+  <div id="screenshot-hint" style="pointer-events:none; display:none;"><b>📸 Billedtagning aktiv</b> Træk rammen • Tag billede for at gemme • Højreklik for at annullere</div>
   
   <div id="natura-legend">
     <b>🌿 Natura 2000 Områder:</b>
@@ -448,7 +449,7 @@
       onAdd: function() {
         const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
         const button = L.DomUtil.create('a', 'screenshot-btn', container);
-        button.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z"/></svg>`;
+        button.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z"/></svg>`;
         button.href = '#';
         button.title = 'Tag billede af kortet (Vælg område og klik på knappen i bunden)';
         L.DomEvent.on(button, 'click', function(e) {
@@ -465,17 +466,28 @@
     function toggleScreenshot() {
       screenshotActive = !screenshotActive;
       const button = document.querySelector('.screenshot-btn');
+      const hint = document.getElementById('screenshot-hint');
       if (screenshotActive) {
         button.classList.add('screenshot-active');
         screenshotOverlay.style.display = 'block';
         captureContainer.style.display = 'block';
+        hint.style.display = 'block';
         if (rulerActive) toggleRuler();
       } else {
         button.classList.remove('screenshot-active');
         screenshotOverlay.style.display = 'none';
         captureContainer.style.display = 'none';
+        hint.style.display = 'none';
       }
     }
+
+    // Right-click to exit screenshot mode
+    screenshotOverlay.addEventListener('contextmenu', (e) => {
+      if (screenshotActive) {
+        e.preventDefault();
+        toggleScreenshot();
+      }
+    });
 
     // Draggable logic for crop-box
     let isDragging = false;
