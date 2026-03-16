@@ -92,8 +92,9 @@
       background: white; color: #111; padding: 12px 25px; border-radius: 10px;
       font-size: 13px; font-weight: 600; display: none; z-index: 2000;
       box-shadow: 0 4px 15px rgba(0,0,0,0.15); border: 1px solid #ddd;
+      width: max-content;      /* Adapt to text length */
+      max-width: 95vw;
       white-space: nowrap;
-      width: min(550px, 90vw); /* Fixed responsive width */
       text-align: center;      /* Centered text */
     }
     #ruler-hint b, #screenshot-hint b, #natura-legend b { color: #1a5f2a; margin-right: 5px; }
@@ -134,7 +135,7 @@
       resize: both; overflow: hidden;
     }
     #capture-action-container {
-      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+      position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
       z-index: 3001; display: none;
     }
     .capture-btn {
@@ -483,6 +484,12 @@
 
     // Right-click to exit screenshot mode
     screenshotOverlay.addEventListener('contextmenu', (e) => {
+      if (screenshotActive) {
+        e.preventDefault();
+        toggleScreenshot();
+      }
+    });
+    cropBox.addEventListener('contextmenu', (e) => {
       if (screenshotActive) {
         e.preventDefault();
         toggleScreenshot();
