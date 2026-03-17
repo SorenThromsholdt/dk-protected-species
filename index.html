@@ -132,8 +132,28 @@
       border: 2px dashed #1a5f2a; background: rgba(255,255,255,0.05);
       box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); pointer-events: auto;
       cursor: move; min-width: 50px; min-height: 50px;
-      resize: both; overflow: hidden;
     }
+    
+    /* Resize handles */
+    .handle {
+      position: absolute;
+      z-index: 10;
+    }
+    /* Corners */
+    .handle-corner { 
+      width: 14px; height: 14px; background: #1a5f2a; 
+      border: 2px solid white; border-radius: 50%; 
+    }
+    .handle.nw { top: -7px; left: -7px; cursor: nw-resize; }
+    .handle.ne { top: -7px; right: -7px; cursor: ne-resize; }
+    .handle.sw { bottom: -7px; left: -7px; cursor: sw-resize; }
+    .handle.se { bottom: -7px; right: -7px; cursor: se-resize; }
+    
+    /* Sides */
+    .handle.n { top: -5px; left: 7px; right: 7px; height: 10px; cursor: n-resize; }
+    .handle.s { bottom: -5px; left: 7px; right: 7px; height: 10px; cursor: s-resize; }
+    .handle.w { top: 7px; bottom: 7px; left: -5px; width: 10px; cursor: w-resize; }
+    .handle.e { top: 7px; bottom: 7px; right: -5px; width: 10px; cursor: e-resize; }
     #capture-action-container {
       position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
       z-index: 3001; display: none;
@@ -172,7 +192,16 @@
   </div>
 
   <div id="screenshot-overlay">
-    <div id="crop-box"></div>
+    <div id="crop-box">
+      <div class="handle nw handle-corner"></div>
+      <div class="handle n"></div>
+      <div class="handle ne handle-corner"></div>
+      <div class="handle w"></div>
+      <div class="handle e"></div>
+      <div class="handle sw handle-corner"></div>
+      <div class="handle s"></div>
+      <div class="handle se handle-corner"></div>
+    </div>
   </div>
 
   <div id="capture-action-container">
@@ -496,32 +525,87 @@
       }
     });
 
-    // Draggable logic for crop-box
-    let isDragging = false;
-    let startX, startY, startLeft, startTop;
+    // Enhanced resizing and dragging logic for crop-box
+    let currentHandle = null;
+    let isResizing = false;
+    let isMoving = false;
+    let initialX, initialY, initialWidth, initialHeight, initialLeft, initialTop;
 
-    cropBox.addEventListener('mousedown', (e) => {
-      // Don't drag if we're hitting the resize handle (bottom right)
+    const startAction = (e) => {
+      const handle = e.target.closest('.handle');
+      if (handle) {
+        isResizing = true;
+        // The second class is the direction (nw, n, ne, etc.)
+        currentHandle = Array.from(handle.classList).find(c => c !== 'handle' && c !== 'handle-corner');
+      } else if (e.target === cropBox) {
+        isMoving = true;
+      } else {
+        return;
+      }
+
+      initialX = e.clientX;
+      initialY = e.clientY;
       const rect = cropBox.getBoundingClientRect();
-      if (e.clientX > rect.right - 20 && e.clientY > rect.bottom - 20) return;
+      initialWidth = rect.width;
+      initialHeight = rect.height;
+      initialLeft = cropBox.offsetLeft;
+      initialTop = cropBox.offsetTop;
 
-      isDragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      startLeft = cropBox.offsetLeft;
-      startTop = cropBox.offsetTop;
       e.preventDefault();
-    });
+      e.stopPropagation();
+    };
 
-    window.addEventListener('mousemove', (e) => {
-      if (!isDragging) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      cropBox.style.left = (startLeft + dx) + 'px';
-      cropBox.style.top = (startTop + dy) + 'px';
-    });
+    const doAction = (e) => {
+      if (!isResizing && !isMoving) return;
 
-    window.addEventListener('mouseup', () => { isDragging = false; });
+      const dx = e.clientX - initialX;
+      const dy = e.clientY - initialY;
+
+      if (isMoving) {
+        cropBox.style.left = (initialLeft + dx) + 'px';
+        cropBox.style.top = (initialTop + dy) + 'px';
+      } else if (isResizing) {
+        let newWidth = initialWidth;
+        let newHeight = initialHeight;
+        let newLeft = initialLeft;
+        let newTop = initialTop;
+
+        if (currentHandle.includes('e')) {
+          newWidth = initialWidth + dx;
+        }
+        if (currentHandle.includes('w')) {
+          newWidth = initialWidth - dx;
+          newLeft = initialLeft + dx;
+        }
+        if (currentHandle.includes('s')) {
+          newHeight = initialHeight + dy;
+        }
+        if (currentHandle.includes('n')) {
+          newHeight = initialHeight - dy;
+          newTop = initialTop + dy;
+        }
+
+        // Apply min constraints
+        if (newWidth > 50) {
+          cropBox.style.width = newWidth + 'px';
+          cropBox.style.left = newLeft + 'px';
+        }
+        if (newHeight > 50) {
+          cropBox.style.height = newHeight + 'px';
+          cropBox.style.top = newTop + 'px';
+        }
+      }
+    };
+
+    const stopAction = () => {
+      isResizing = false;
+      isMoving = false;
+      currentHandle = null;
+    };
+
+    cropBox.addEventListener('mousedown', startAction);
+    window.addEventListener('mousemove', doAction);
+    window.addEventListener('mouseup', stopAction);
 
     async function takeScreenshot() {
       const loader = document.getElementById('loader');
