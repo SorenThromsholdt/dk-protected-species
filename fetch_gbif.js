@@ -118,16 +118,27 @@ async function fetchAllForSpecies(taxonKey, species) {
     return totalAdded;
 }
 
+const KINGDOM_MAP = {
+    "Mammals": "Animalia",
+    "Birds": "Animalia",
+    "Reptiles": "Animalia",
+    "Amphibians": "Animalia",
+    "Fish": "Animalia",
+    "Invertebrates": "Animalia",
+    "Plants": "Plantae"
+};
+
 async function processSpecies(species) {
     // Check if already fully fetched (state tracking)
     if (fetchState[species.scientific_name] === "COMPLETE") {
         return 0;
     }
 
-    const match = await throttledFetch(`https://api.gbif.org/v1/species/match?name=${encodeURIComponent(species.scientific_name)}&country=DK`);
+    const kingdom = KINGDOM_MAP[species.group] || "";
+    const match = await throttledFetch(`https://api.gbif.org/v1/species/match?name=${encodeURIComponent(species.scientific_name)}&country=DK&kingdom=${kingdom}`);
     const taxonKey = match ? match.usageKey : null;
     if (!taxonKey) {
-        console.warn(`\n[WARN] No GBIF match for: ${species.scientific_name}`);
+        console.warn(`\n[WARN] No GBIF match for: ${species.scientific_name} (Group: ${species.group}, Kingdom: ${kingdom})`);
         return 0;
     }
 
