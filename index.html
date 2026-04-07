@@ -89,17 +89,17 @@
     /* Centered bottom panels (Ruler Hint, Screenshot Hint & Natura Legend) */
     #ruler-hint, #screenshot-hint, #natura-legend {
       position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-      background: white; color: #111; padding: 12px 25px; border-radius: 10px;
+      background: white; color: #111; padding: 10px 20px; border-radius: 10px;
       font-size: 13px; font-weight: 600; display: none; z-index: 2000;
       box-shadow: 0 4px 15px rgba(0,0,0,0.15); border: 1px solid #ddd;
-      width: max-content;      /* Adapt to text length */
+      width: max-content;
       max-width: 95vw;
-      white-space: nowrap;
-      text-align: center;      /* Centered text */
+      align-items: center;
+      gap: 15px;
     }
-    #ruler-hint b, #screenshot-hint b, #natura-legend b { color: #1a5f2a; margin-right: 5px; }
-    .legend-box { display: inline-flex; align-items: center; gap: 15px; justify-content: center; width: 100%; margin-top: 5px; }
-    .legend-color { width: 14px; height: 14px; border-radius: 3px; display: inline-block; vertical-align: middle; border: 1px solid rgba(0,0,0,0.1); }
+    #ruler-hint b, #screenshot-hint b, #natura-legend b { color: #1a5f2a; margin-right: 5px; white-space: nowrap; }
+    .legend-item-inline { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .legend-color { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
 
     /* Popup Styling */
     .popup-desc { font-size: 12px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px; }
@@ -183,12 +183,11 @@
   <div id="ruler-hint" style="pointer-events:none;"><b>📏 Måling aktiv</b> Klik for punkt • Dobbeltklik for færdig linje • Højreklik for at rydde</div>
   <div id="screenshot-hint" style="pointer-events:none; display:none;"><b>📸 Billedtagning aktiv</b> Træk rammen • Tag billede for at gemme • Højreklik for at annullere</div>
   
-  <div id="natura-legend">
-    <b>🌿 Natura 2000 Områder:</b>
-    <div class="legend-box">
-      <span><span class="legend-color" style="background:#8e44ad; opacity:0.7"></span> Habitatområder</span>
-      <span><span class="legend-color" style="background:#e84393; opacity:0.8"></span> Fuglebeskyttelse</span>
-    </div>
+  <div id="natura-legend" style="display:none; align-items:center; gap:15px; white-space:nowrap;">
+    <b style="color:#1a5f2a; margin-right:5px;">🌿 Beskyttede Områder:</b>
+    <span class="legend-item-inline"><span class="legend-color" style="background:#8e44ad; opacity:0.7"></span> Habitatområder</span>
+    <span class="legend-item-inline"><span class="legend-color" style="background:#e84393; opacity:0.8"></span> Fuglebeskyttelse</span>
+    <span class="legend-item-inline"><span class="legend-color" style="background:#2ecc71; opacity:0.6"></span> § 3 Beskyttet Natur</span>
   </div>
 
   <div id="screenshot-overlay">
@@ -446,13 +445,37 @@
       crossOrigin: true
     });
 
+    // § 3 Beskyttet Natur - Fil-baseret overlay (GeoJSON)
+    const p3Layer = L.geoJSON(null, {
+      style: {
+        color: '#27ae60',
+        weight: 1,
+        fillColor: '#2ecc71',
+        fillOpacity: 0.6
+      },
+      onEachFeature: (feature, layer) => {
+        if (feature.properties && feature.properties.Natyp_navn) {
+          layer.bindPopup(`<b>§ 3 Naturbeskyttelse</b><br>Type: ${feature.properties.Natyp_navn}<br>Område: ${feature.properties.CVR_navn || 'Ukendt'}`);
+        }
+      }
+    });
+
+    // Hent § 3 data fra fil
+    fetch('paragraf3.json')
+      .then(res => res.json())
+      .then(data => {
+        p3Layer.addData(data);
+      })
+      .catch(err => console.error("Kunne ikke hente § 3 data:", err));
+
     const baseMaps = { 
       "OpenStreetMap": osm,
       "Ortofoto (Satellit)": ortofoto
     };
     const overlayMaps = { 
       "Natura 2000 - Habitatområder": habitatLayer,
-      "Natura 2000 - Fuglebeskyttelse": birdLayer
+      "Natura 2000 - Fuglebeskyttelse": birdLayer,
+      "§ 3 Beskyttet Natur": p3Layer
     };
 
     L.control.layers(baseMaps, overlayMaps, { position: 'topleft' }).addTo(map);
@@ -460,8 +483,8 @@
     // Funktion til at vise/skjule signaturforklaring
     function updateNaturaLegend() {
       const legend = document.getElementById('natura-legend');
-      if (map.hasLayer(habitatLayer) || map.hasLayer(birdLayer)) {
-        legend.style.display = 'block';
+      if (map.hasLayer(habitatLayer) || map.hasLayer(birdLayer) || map.hasLayer(p3Layer)) {
+        legend.style.display = 'flex';
       } else {
         legend.style.display = 'none';
       }
