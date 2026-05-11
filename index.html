@@ -194,10 +194,11 @@
     <div id="screenshot-hint" style="pointer-events:none; display:none;"><b>📸 Billedtagning aktiv</b> Træk rammen • Tag billede for at gemme • Højreklik for at annullere</div>
     
     <div id="natura-legend" style="display:none; align-items:center; gap:15px; white-space:nowrap;">
-      <b style="color:#1a5f2a; margin-right:5px;">🌿 Beskyttede Områder:</b>
-      <span class="legend-item-inline"><span class="legend-color" style="background:#8e44ad; opacity:0.7"></span> Habitatområder</span>
-      <span class="legend-item-inline"><span class="legend-color" style="background:#e84393; opacity:0.8"></span> Fuglebeskyttelse</span>
-      <span class="legend-item-inline"><span class="legend-color" style="background:#2ecc71; opacity:0.6"></span> § 3 Beskyttet Natur</span>
+      <b style="color:#1a5f2a; margin-right:5px;">🌿 Områder:</b>
+      <span id="legend-habitat" class="legend-item-inline"><span class="legend-color" style="background:#8e44ad; opacity:0.7"></span> Habitatområder</span>
+      <span id="legend-bird" class="legend-item-inline"><span class="legend-color" style="background:#e84393; opacity:0.8"></span> Fuglebeskyttelse</span>
+      <span id="legend-p3" class="legend-item-inline"><span class="legend-color" style="background:#2ecc71; opacity:0.6"></span> § 3 Natur</span>
+      <span id="legend-church" class="legend-item-inline"><span class="legend-color" style="background:#FF6B35; opacity:0.9; border-style: dashed; border-width: 2px; border-color: #FF6B35;"></span> Kirkestier</span>
     </div>
   </div>
 
@@ -456,19 +457,80 @@
       crossOrigin: true
     });
 
-    // § 3 Beskyttet Natur - Fil-baseret overlay (GeoJSON)
+    // § 3 Beskyttet Natur - Fil-baseret overlay (GeoJSON) med zoom-afhængig styling
     const p3Layer = L.geoJSON(null, {
-      style: {
-        color: '#27ae60',
-        weight: 1,
-        fillColor: '#2ecc71',
-        fillOpacity: 0.6
+      style: function(feature) {
+        const zoomLevel = map.getZoom();
+        // Opacity scales with zoom: more visible when zoomed out, less when zoomed in
+        const opacity = Math.min(0.8, 0.3 + zoomLevel * 0.05);
+        return {
+          color: '#27ae60',
+          weight: 1,
+          fillColor: '#2ecc71',
+          fillOpacity: opacity
+        };
       },
       onEachFeature: (feature, layer) => {
         if (feature.properties && feature.properties.Natyp_navn) {
           layer.bindPopup(`<b>§ 3 Naturbeskyttelse</b><br>Type: ${feature.properties.Natyp_navn}<br>Område: ${feature.properties.CVR_navn || 'Ukendt'}`);
         }
       }
+    });
+
+    // Opdater paragraf 3 opacity når zoom ændres
+    map.on('zoomend', () => {
+      const zoomLevel = map.getZoom();
+      p3Layer.setStyle(function(feature) {
+        const opacity = Math.min(0.8, 0.3 + zoomLevel * 0.05);
+        return { fillOpacity: opacity };
+      });
+    });
+
+    // Historiske Kirkestier - GeoJSON med zoom-afhængig styling
+    const churchPathLayer = L.geoJSON(null, {
+      style: function(feature) {
+        const zoomLevel = map.getZoom();
+        // Line width scales with zoom: thick at low zoom, thin at high zoom
+        const weight = Math.max(0.5, 6 - zoomLevel * 0.25);
+        return {
+          color: '#FF6B35', // Bright orange - not used by other layers
+          weight: weight,
+          opacity: 0.9,
+          dashArray: '5, 5'
+        };
+      },
+      onEachFeature: (feature, layer) => {
+        layer.bindPopup('<b>Historisk stier</b><br>Arkæologisk lokalitet');
+      }
+    });
+
+    // Hent kirkestier data fra WFS med pagination
+    async function fetchChurchPaths() {
+      try {
+        const response = await fetch('https://www.kulturarv.dk/ffgeoserver/public/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=fundogfortidsminder_linie_alle&outputFormat=application/json&maxFeatures=10000&srsName=EPSG:4326&outputFormat=application/json', {
+          timeout: 15000
+        });
+        if (!response.ok) throw new Error('WFS request failed');
+        const data = await response.json();
+        if (data.features && data.features.length > 0) {
+          churchPathLayer.addData(data);
+          console.log(`Loaded ${data.features.length} kirkestier features`);
+        } else {
+          console.warn("No features returned from WFS");
+        }
+      } catch (err) {
+        console.error("Kunne ikke hente kirkestier data:", err);
+      }
+    }
+    fetchChurchPaths();
+
+    // Opdater linie tykkelse når zoom ændres
+    map.on('zoomend', () => {
+      const zoomLevel = map.getZoom();
+      churchPathLayer.setStyle(function(feature) {
+        const weight = Math.max(0.5, 6 - zoomLevel * 0.25);
+        return { weight: weight };
+      });
     });
 
     // Hent § 3 data fra fil
@@ -486,7 +548,8 @@
     const overlayMaps = { 
       "Natura 2000 - Habitatområder": habitatLayer,
       "Natura 2000 - Fuglebeskyttelse": birdLayer,
-      "§ 3 Beskyttet Natur": p3Layer
+      "§ 3 Beskyttet Natur": p3Layer,
+      "Historiske Kirkestier": churchPathLayer
     };
 
     L.control.layers(baseMaps, overlayMaps, { position: 'topleft' }).addTo(map);
@@ -494,8 +557,15 @@
     // Funktion til at vise/skjule signaturforklaring
     function updateNaturaLegend() {
       const legend = document.getElementById('natura-legend');
-      if (map.hasLayer(habitatLayer) || map.hasLayer(birdLayer) || map.hasLayer(p3Layer)) {
+      const layers = [habitatLayer, birdLayer, p3Layer, churchPathLayer];
+      const hasAny = layers.some(l => map.hasLayer(l));
+      
+      if (hasAny) {
         legend.style.display = 'flex';
+        document.getElementById('legend-habitat').style.display = map.hasLayer(habitatLayer) ? 'flex' : 'none';
+        document.getElementById('legend-bird').style.display = map.hasLayer(birdLayer) ? 'flex' : 'none';
+        document.getElementById('legend-p3').style.display = map.hasLayer(p3Layer) ? 'flex' : 'none';
+        document.getElementById('legend-church').style.display = map.hasLayer(churchPathLayer) ? 'flex' : 'none';
       } else {
         legend.style.display = 'none';
       }
