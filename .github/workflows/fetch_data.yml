@@ -1,0 +1,35 @@
+name: Weekly GBIF Data Fetch
+
+on:
+  schedule:
+    - cron: '0 12 * * 5' # Hver fredag kl. 12:00 UTC
+  workflow_dispatch: # Gør det muligt at køre den manuelt fra GitHub UI
+
+jobs:
+  fetch-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Påkrævet for at kunne pushe ændringer tilbage til repoet
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run fetch script
+        run: node fetch_gbif.js
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/*.json fetch_state.json
+          if git diff --staged --quiet; then
+            echo "Ingen ændringer at committe."
+          else
+            git commit -m "Automatisk dataopdatering: $(date +'%Y-%m-%d')"
+            git push
+          fi
