@@ -128,9 +128,16 @@ const KINGDOM_MAP = {
     "Plants": "Plantae"
 };
 
-async function processSpecies(species) {
-    // Check if already fully fetched (state tracking)
-    if (fetchState[species.scientific_name] === "COMPLETE") {
+function shouldSkipSpecies(speciesName, state, options = {}) {
+    const { skipCompleted = false } = options;
+    return skipCompleted && state[speciesName] === "COMPLETE";
+}
+
+async function processSpecies(species, options = {}) {
+    const { skipCompleted = false } = options;
+
+    // Only skip previously completed species when explicitly requested.
+    if (shouldSkipSpecies(species.scientific_name, fetchState, { skipCompleted })) {
         return 0;
     }
 
@@ -160,6 +167,8 @@ function printProgressBar(current, total, lastSpecies, count, barSize = 40) {
 }
 
 async function main() {
+    const skipCompleted = process.argv.includes('--skip-completed');
+
     console.log(`Starting Optimized Data Fetch (All-at-once pagination)...`);
     console.log(`Target: ${SPECIES_LIST.length} species`);
     
@@ -173,7 +182,7 @@ async function main() {
         while (queue.length > 0) {
             const species = queue.shift();
             try {
-                const count = await processSpecies(species);
+                const count = await processSpecies(species, { skipCompleted });
                 completedCount++;
                 printProgressBar(completedCount, totalCount, species.danish_name, count);
             } catch (err) {
@@ -195,4 +204,10 @@ async function main() {
     console.log("\n\n*** DATA UPDATE COMPLETE! (Optimized Method) ***");
 }
 
-main().catch(console.error);
+if (require.main === module) {
+    main().catch(console.error);
+}
+
+module.exports = {
+    shouldSkipSpecies
+};
